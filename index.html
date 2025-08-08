@@ -44,12 +44,12 @@
 
         .mode-btn {
             flex: 1;
-            min-width: 150px;
+            min-width: 120px;
             padding: 15px;
             background: white;
             border: none;
             border-radius: 10px;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s;
@@ -64,6 +64,15 @@
         .mode-btn.active {
             background: #4CAF50;
             color: white;
+        }
+
+        .mode-btn.hard {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FF8E53 100%);
+            color: white;
+        }
+
+        .mode-btn.hard.active {
+            background: linear-gradient(135deg, #FF4444 0%, #FF6600 100%);
         }
 
         .course-selector {
@@ -105,6 +114,33 @@
             min-height: 400px;
         }
 
+        .timer-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .timer-progress {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #FFC107, #FF5722);
+            transition: width 0.1s linear;
+            border-radius: 15px;
+        }
+
+        .timer-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-weight: bold;
+            color: #333;
+            z-index: 1;
+        }
+
         .step-counter {
             text-align: center;
             font-size: 18px;
@@ -127,6 +163,15 @@
             color: #333;
         }
 
+        .hard-mode-indicator {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #FF4444;
+            margin-bottom: 15px;
+            animation: pulse 1s infinite;
+        }
+
         .direction-icon {
             font-size: 48px;
             margin-left: 15px;
@@ -136,10 +181,12 @@
             display: flex;
             gap: 15px;
             margin-bottom: 20px;
+            flex-wrap: wrap;
         }
 
         .answer-btn {
             flex: 1;
+            min-width: 150px;
             padding: 20px;
             font-size: 20px;
             border: 2px solid #ddd;
@@ -253,6 +300,13 @@
             margin-bottom: 20px;
         }
 
+        .time-record {
+            font-size: 36px;
+            font-weight: bold;
+            color: #2196F3;
+            margin-bottom: 10px;
+        }
+
         .voice-btn {
             padding: 10px 20px;
             background: #FF9800;
@@ -271,6 +325,28 @@
             background: #4CAF50;
             animation: pulse 1s infinite;
         }
+
+        .start-screen {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .start-btn {
+            padding: 20px 40px;
+            font-size: 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px;
+        }
+
+        .start-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
     </style>
 </head>
 <body>
@@ -283,11 +359,12 @@
         <div class="mode-selector">
             <button class="mode-btn active" onclick="setMode('practice')">練習モード</button>
             <button class="mode-btn" onclick="setMode('test')">テストモード</button>
+            <button class="mode-btn hard" onclick="setMode('hard')">🔥ハードモード</button>
             <button class="mode-btn" onclick="setMode('view')">一覧表示</button>
             <button class="mode-btn" onclick="setMode('voice')">音声練習</button>
         </div>
 
-        <div class="course-selector">
+        <div class="course-selector" id="courseSelector">
             <button class="course-btn active" onclick="selectCourse('A')">A</button>
             <button class="course-btn" onclick="selectCourse('B')">B</button>
             <button class="course-btn" onclick="selectCourse('C')">C</button>
@@ -313,26 +390,39 @@
 
         let currentMode = 'practice';
         let currentCourse = 'A';
-        let currentStep = 0;
+        let currentStep = -1;  // -1から開始（最初の問題を表示するため）
         let score = 0;
         let attempts = 0;
         let voiceActive = false;
+        let hardModeTimer = null;
+        let startTime = null;
+        let timeLimit = 60;
+        let remainingTime = 60;
 
         function setMode(mode) {
             currentMode = mode;
-            currentStep = 0;
+            currentStep = -1;  // -1から開始
             score = 0;
             attempts = 0;
+            clearInterval(hardModeTimer);
 
             document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
 
-            updateDisplay();
+            // ハードモードの場合はコース選択を非表示
+            const courseSelector = document.getElementById('courseSelector');
+            if (mode === 'hard') {
+                courseSelector.style.display = 'none';
+                showHardModeStart();
+            } else {
+                courseSelector.style.display = 'flex';
+                updateDisplay();
+            }
         }
 
         function selectCourse(course) {
             currentCourse = course;
-            currentStep = 0;
+            currentStep = -1;  // -1から開始
             score = 0;
             attempts = 0;
 
@@ -342,6 +432,54 @@
             updateDisplay();
         }
 
+        function showHardModeStart() {
+            const gameArea = document.getElementById('gameArea');
+            gameArea.innerHTML = `
+                <div class="start-screen">
+                    <h2 style="color: #FF4444; margin-bottom: 20px;">🔥 ハードモード 🔥</h2>
+                    <p style="font-size: 18px; margin-bottom: 20px;">
+                        コースはランダムで選ばれます<br>
+                        制限時間: <strong>60秒</strong><br>
+                        全問正解を目指そう！
+                    </p>
+                    <button class="start-btn" onclick="startHardMode()">スタート！</button>
+                </div>
+            `;
+        }
+
+        function startHardMode() {
+            // ランダムにコースを選択
+            const courseKeys = Object.keys(courses);
+            currentCourse = courseKeys[Math.floor(Math.random() * courseKeys.length)];
+            currentStep = -1;
+            score = 0;
+            attempts = 0;
+            startTime = Date.now();
+            remainingTime = timeLimit;
+
+            // タイマー開始
+            hardModeTimer = setInterval(() => {
+                remainingTime--;
+                updateTimerDisplay();
+                if (remainingTime <= 0) {
+                    clearInterval(hardModeTimer);
+                    showHardModeResult(false);
+                }
+            }, 1000);
+
+            updateDisplay();
+        }
+
+        function updateTimerDisplay() {
+            const timerBar = document.querySelector('.timer-progress');
+            const timerText = document.querySelector('.timer-text');
+            if (timerBar && timerText) {
+                const percentage = (remainingTime / timeLimit) * 100;
+                timerBar.style.width = percentage + '%';
+                timerText.textContent = `残り ${remainingTime} 秒`;
+            }
+        }
+
         function updateDisplay() {
             const gameArea = document.getElementById('gameArea');
 
@@ -349,6 +487,8 @@
                 showPracticeMode();
             } else if (currentMode === 'test') {
                 showTestMode();
+            } else if (currentMode === 'hard') {
+                showHardMode();
             } else if (currentMode === 'view') {
                 showViewMode();
             } else if (currentMode === 'voice') {
@@ -360,25 +500,27 @@
             const steps = courses[currentCourse];
             const gameArea = document.getElementById('gameArea');
 
-            if (currentStep >= steps.length) {
+            // 最後まで完了した場合
+            if (currentStep >= steps.length - 1) {
                 gameArea.innerHTML = `
                     <div class="results">
                         <h2>コース${currentCourse} 完了！</h2>
                         <div class="score">パーフェクト！</div>
                         <p>全${steps.length}ステップをマスターしました</p>
-                        <button class="control-btn" onclick="currentStep=0; updateDisplay()">もう一度練習</button>
+                        <button class="control-btn" onclick="currentStep=-1; updateDisplay()">もう一度練習</button>
                     </div>
                 `;
                 return;
             }
 
-            const currentItem = steps[currentStep];
-            const nextItem = currentStep < steps.length - 1 ? steps[currentStep + 1] : '終了';
+            // 表示する問題（-1の場合は「スタート」から始める）
+            const displayText = currentStep === -1 ? 'スタート' : steps[currentStep];
+            const nextItem = steps[currentStep + 1];
 
             gameArea.innerHTML = `
-                <div class="step-counter">ステップ ${currentStep + 1} / ${steps.length}</div>
+                <div class="step-counter">ステップ ${currentStep + 2} / ${steps.length}</div>
                 <div class="current-step">
-                    ${currentItem} ${getDirectionIcon(currentItem)}
+                    ${displayText} ${getDirectionIcon(displayText)}
                 </div>
                 <div style="text-align: center; margin-bottom: 20px; color: #666;">
                     次は何でしょう？
@@ -389,7 +531,7 @@
                 <div class="control-area">
                     <button class="control-btn" onclick="showAnswer()">答えを見る</button>
                     <button class="control-btn" onclick="nextStep()">次へ</button>
-                    <button class="control-btn" onclick="currentStep=0; updateDisplay()">最初から</button>
+                    <button class="control-btn" onclick="currentStep=-1; updateDisplay()">最初から</button>
                 </div>
             `;
         }
@@ -398,24 +540,26 @@
             const steps = courses[currentCourse];
             const gameArea = document.getElementById('gameArea');
 
-            if (currentStep >= steps.length) {
+            // 最後まで完了した場合
+            if (currentStep >= steps.length - 1) {
                 const percentage = Math.round((score / attempts) * 100);
                 gameArea.innerHTML = `
                     <div class="results">
                         <h2>テスト結果</h2>
                         <div class="score">${percentage}%</div>
                         <p>正解: ${score} / ${attempts}</p>
-                        <button class="control-btn" onclick="currentStep=0; score=0; attempts=0; updateDisplay()">もう一度テスト</button>
+                        <button class="control-btn" onclick="currentStep=-1; score=0; attempts=0; updateDisplay()">もう一度テスト</button>
                     </div>
                 `;
                 return;
             }
 
-            const currentItem = steps[currentStep];
-            const correctAnswer = currentStep < steps.length - 1 ? steps[currentStep + 1] : '終了';
+            // 表示する問題
+            const displayText = currentStep === -1 ? 'スタート' : steps[currentStep];
+            const correctAnswer = steps[currentStep + 1];
 
             // ランダムな選択肢を生成
-            const allOptions = [...new Set(steps.concat(['終了']))];
+            const allOptions = [...new Set(steps)];
             const options = [correctAnswer];
             while (options.length < Math.min(3, allOptions.length)) {
                 const randomOption = allOptions[Math.floor(Math.random() * allOptions.length)];
@@ -426,9 +570,9 @@
             options.sort(() => Math.random() - 0.5);
 
             gameArea.innerHTML = `
-                <div class="step-counter">問題 ${currentStep + 1} / ${steps.length}</div>
+                <div class="step-counter">問題 ${currentStep + 2} / ${steps.length}</div>
                 <div class="current-step">
-                    ${currentItem} ${getDirectionIcon(currentItem)}
+                    ${displayText} ${getDirectionIcon(displayText)}
                 </div>
                 <div style="text-align: center; margin-bottom: 20px; color: #666;">
                     次は何でしょう？
@@ -439,6 +583,99 @@
                     `).join('')}
                 </div>
             `;
+        }
+
+        function showHardMode() {
+            const steps = courses[currentCourse];
+            const gameArea = document.getElementById('gameArea');
+
+            // 最後まで完了した場合
+            if (currentStep >= steps.length - 1) {
+                clearInterval(hardModeTimer);
+                showHardModeResult(true);
+                return;
+            }
+
+            // 表示する問題
+            const displayText = currentStep === -1 ? 'スタート' : steps[currentStep];
+            const correctAnswer = steps[currentStep + 1];
+
+            // ランダムな選択肢を生成
+            const allOptions = [...new Set(steps)];
+            const options = [correctAnswer];
+            while (options.length < Math.min(4, allOptions.length)) {
+                const randomOption = allOptions[Math.floor(Math.random() * allOptions.length)];
+                if (!options.includes(randomOption)) {
+                    options.push(randomOption);
+                }
+            }
+            options.sort(() => Math.random() - 0.5);
+
+            gameArea.innerHTML = `
+                <div class="hard-mode-indicator">コース: ${currentCourse}</div>
+                <div class="timer-bar">
+                    <div class="timer-progress"></div>
+                    <div class="timer-text">残り ${remainingTime} 秒</div>
+                </div>
+                <div class="step-counter">問題 ${currentStep + 2} / ${steps.length}</div>
+                <div class="current-step">
+                    ${displayText} ${getDirectionIcon(displayText)}
+                </div>
+                <div style="text-align: center; margin-bottom: 20px; color: #666;">
+                    次は何でしょう？
+                </div>
+                <div class="answer-area">
+                    ${options.map(opt => `
+                        <button class="answer-btn" onclick="hardModeAnswer('${opt}', '${correctAnswer}')">${opt}</button>
+                    `).join('')}
+                </div>
+            `;
+
+            updateTimerDisplay();
+        }
+
+        function showHardModeResult(success) {
+            const gameArea = document.getElementById('gameArea');
+            const elapsedTime = Math.round((Date.now() - startTime) / 1000);
+
+            if (success) {
+                gameArea.innerHTML = `
+                    <div class="results">
+                        <h2 style="color: #FF4444;">🎉 ハードモードクリア！ 🎉</h2>
+                        <div class="time-record">${elapsedTime}秒</div>
+                        <p>コース${currentCourse}を完璧にマスター！</p>
+                        <p>正解率: ${Math.round((score / attempts) * 100)}%</p>
+                        <button class="start-btn" onclick="startHardMode()">もう一度挑戦</button>
+                    </div>
+                `;
+            } else {
+                gameArea.innerHTML = `
+                    <div class="results">
+                        <h2 style="color: #666;">タイムアウト...</h2>
+                        <p>コース: ${currentCourse}</p>
+                        <p>到達: ${currentStep + 2} / ${courses[currentCourse].length}</p>
+                        <button class="start-btn" onclick="startHardMode()">再挑戦</button>
+                    </div>
+                `;
+            }
+        }
+
+        function hardModeAnswer(answer, correctAnswer) {
+            attempts++;
+            if (answer === correctAnswer) {
+                score++;
+                event.target.classList.add('correct');
+                setTimeout(() => {
+                    currentStep++;
+                    updateDisplay();
+                }, 500);
+            } else {
+                event.target.classList.add('wrong');
+                clearInterval(hardModeTimer);
+                setTimeout(() => {
+                    showHardModeResult(false);
+                }, 1000);
+            }
         }
 
         function showViewMode() {
@@ -533,13 +770,13 @@
         function getDirectionIcon(item) {
             if (item.includes('右')) return '➡️';
             if (item.includes('左')) return '⬅️';
-            if (item.includes('停車')) return '🅿️';
+            if (item.includes('停車') || item.includes('停止')) return '🅿️';
             return '';
         }
 
         function checkAnswer(answer) {
             const steps = courses[currentCourse];
-            const correctAnswer = currentStep < steps.length - 1 ? steps[currentStep + 1] : '終了';
+            const correctAnswer = steps[currentStep + 1];
 
             if (answer === correctAnswer) {
                 event.target.classList.add('correct');
@@ -567,7 +804,7 @@
 
         function showAnswer() {
             const steps = courses[currentCourse];
-            const correctAnswer = currentStep < steps.length - 1 ? steps[currentStep + 1] : '終了';
+            const correctAnswer = steps[currentStep + 1];
             alert(`答え: ${correctAnswer}`);
         }
 
