@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仮免コース暗記トレーニング</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        
+        .app-header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+        
+        .app-header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .mode-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .mode-btn {
+            flex: 1;
+            min-width: 150px;
+            padding: 15px;
+            background: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .mode-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        
+        .mode-btn.active {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .course-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .course-btn {
+            width: 60px;
+            height: 60px;
+            border: 3px solid white;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .course-btn:hover {
+            background: rgba(255,255,255,0.3);
+            transform: scale(1.1);
+        }
+        
+        .course-btn.active {
+            background: white;
+            color: #667eea;
+        }
+        
+        .game-area {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            min-height: 400px;
+        }
+        
+        .step-counter {
+            text-align: center;
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 20px;
+        }
+        
+        .current-step {
+            text-align: center;
+            padding: 40px;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            border-radius: 10px;
+            margin-bottom: 30px;
+            min-height: 150px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .direction-icon {
+            font-size: 48px;
+            margin-left: 15px;
+        }
+        
+        .answer-area {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .answer-btn {
+            flex: 1;
+            padding: 20px;
+            font-size: 20px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .answer-btn:hover {
+            background: #f0f0f0;
+            transform: translateY(-2px);
+        }
+        
+        .answer-btn.correct {
+            background: #4CAF50;
+            color: white;
+            border-color: #4CAF50;
+            animation: pulse 0.5s;
+        }
+        
+        .answer-btn.wrong {
+            background: #f44336;
+            color: white;
+            border-color: #f44336;
+            animation: shake 0.5s;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        
+        .control-area {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .control-btn {
+            flex: 1;
+            padding: 15px;
+            font-size: 16px;
+            border: none;
+            background: #667eea;
+            color: white;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .control-btn:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+        }
+        
+        .control-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .course-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .course-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            transition: all 0.3s;
+        }
+        
+        .course-item:hover {
+            background: #e0e0e0;
+        }
+        
+        .step-number {
+            width: 30px;
+            height: 30px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        
+        .results {
+            text-align: center;
+            padding: 30px;
+        }
+        
+        .score {
+            font-size: 48px;
+            font-weight: bold;
+            color: #4CAF50;
+            margin-bottom: 20px;
+        }
+        
+        .voice-btn {
+            padding: 10px 20px;
+            background: #FF9800;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+        
+        .voice-btn:hover {
+            background: #F57C00;
+        }
+        
+        .voice-btn.active {
+            background: #4CAF50;
+            animation: pulse 1s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="app-header">
+            <h1>🚗 仮免コース暗記トレーニング 🚗</h1>
+            <p>6つのコースを効率的に暗記しよう！</p>
+        </div>
+        
+        <div class="mode-selector">
+            <button class="mode-btn active" onclick="setMode('practice')">練習モード</button>
+            <button class="mode-btn" onclick="setMode('test')">テストモード</button>
+            <button class="mode-btn" onclick="setMode('view')">一覧表示</button>
+            <button class="mode-btn" onclick="setMode('voice')">音声練習</button>
+        </div>
+        
+        <div class="course-selector">
+            <button class="course-btn active" onclick="selectCourse('A')">A</button>
+            <button class="course-btn" onclick="selectCourse('B')">B</button>
+            <button class="course-btn" onclick="selectCourse('C')">C</button>
+            <button class="course-btn" onclick="selectCourse('D')">D</button>
+            <button class="course-btn" onclick="selectCourse('E')">E</button>
+            <button class="course-btn" onclick="selectCourse('F')">F</button>
+        </div>
+        
+        <div class="game-area" id="gameArea">
+            <!-- コンテンツはJavaScriptで動的に生成 -->
+        </div>
+    </div>
+    
+    <script>
+        const courses = {
+            A: ['🚧 障害物①', '🚃 踏切・坂道', '1・右', '📐 クランク・右', '2・右', '🚦 信号・右', '5・左', '🚧 障害物②', '11・左', '2・右', '4・右', '🛑 一時停止①・左', '9・左', '3・右', '9・右', '🚦 信号・左', '🛑 一時停止②・左', '13・左', '🐍 S字・右', '9・右', '50停車'],
+            B: ['🚧 障害物①', '🚃 踏切・坂道', '1・右', '📐 クランク・左', '🚧 障害物②', '11・左', '🚦 信号・左', '5・右', '2・右', '🚦 信号・左', '8・右', '🛑 一時停止①・左', '2・左', '🛑 一時停止②・左', '13・左', '🐍 S字・右', '9・右', '50停車'],
+            C: ['🚧 障害物①', '🚃 踏切・坂道', '1・右', '📐 クランク・右', '2・右', '🚦 信号・右', '5・左', '🚧 障害物②', '11・左', '2・右', '4・右', '🛑 一時停止①・左', '5・左', '🚦 信号・右', '🛑 一時停止②・左', '13・左', '🐍 S字・右', '9・右', '50停車'],
+            D: ['🚧 障害物①', '11・右', '🚦 信号・左', '5・右', '1・右', '📐 クランク・左', '🚦 信号・左', '🚧 障害物②', '11・左', '🚦 信号・右', '7・右', '13・左', '🐍 S字・右', '🚦 信号・左', '🛑 一時停止②・右', '🚃 踏切・坂道', '3・右', '🛑 一時停止①・左', '4・左', '9・右', '50停車'],
+            E: ['50', '1・右', '🚦 信号・左', '5・左', '🚦 信号・右', '🛑 一時停止②・左', '13・左', '🐍 S字・右', '9・左', '3・左', '🛑 一時停止①・左', '4・左', '9・右', '🚧 障害物①', '🚃 踏切・坂道', '1・右', '📐 クランク・左', '🚧 障害物②', '11・左', '🚦 信号・左', '5・右', '停車'],
+            F: ['🚧 障害物①', '11・右', '🚦 信号・右', '7・右', '13・左', '🐍 S字・右', '🚦 信号・左', '🛑 一時停止②・右', '🚃 踏切・坂道', '1・右', '📐 クランク・左', '🚦 信号・左', '🚧 障害物②', '11・左', '2・右', '3・右', '🛑 一時停止①・左', '4・左', '9・右', '50停車']
+        };
+        
+        let currentMode = 'practice';
+        let currentCourse = 'A';
+        let currentStep = 0;
+        let score = 0;
+        let attempts = 0;
+        let voiceActive = false;
+        
+        function setMode(mode) {
+            currentMode = mode;
+            currentStep = 0;
+            score = 0;
+            attempts = 0;
+            
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            updateDisplay();
+        }
+        
+        function selectCourse(course) {
+            currentCourse = course;
+            currentStep = 0;
+            score = 0;
+            attempts = 0;
+            
+            document.querySelectorAll('.course-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            updateDisplay();
+        }
+        
+        function updateDisplay() {
+            const gameArea = document.getElementById('gameArea');
+            
+            if (currentMode === 'practice') {
+                showPracticeMode();
+            } else if (currentMode === 'test') {
+                showTestMode();
+            } else if (currentMode === 'view') {
+                showViewMode();
+            } else if (currentMode === 'voice') {
+                showVoiceMode();
+            }
+        }
+        
+        function showPracticeMode() {
+            const steps = courses[currentCourse];
+            const gameArea = document.getElementById('gameArea');
+            
+            if (currentStep >= steps.length) {
+                gameArea.innerHTML = `
+                    <div class="results">
+                        <h2>コース${currentCourse} 完了！</h2>
+                        <div class="score">パーフェクト！</div>
+                        <p>全${steps.length}ステップをマスターしました</p>
+                        <button class="control-btn" onclick="currentStep=0; updateDisplay()">もう一度練習</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            const currentItem = steps[currentStep];
+            const nextItem = currentStep < steps.length - 1 ? steps[currentStep + 1] : '終了';
+            
+            gameArea.innerHTML = `
+                <div class="step-counter">ステップ ${currentStep + 1} / ${steps.length}</div>
+                <div class="current-step">
+                    ${currentItem} ${getDirectionIcon(currentItem)}
+                </div>
+                <div style="text-align: center; margin-bottom: 20px; color: #666;">
+                    次は何でしょう？
+                </div>
+                <div class="answer-area">
+                    <button class="answer-btn" onclick="checkAnswer('${nextItem}')">${nextItem}</button>
+                </div>
+                <div class="control-area">
+                    <button class="control-btn" onclick="showAnswer()">答えを見る</button>
+                    <button class="control-btn" onclick="nextStep()">次へ</button>
+                    <button class="control-btn" onclick="currentStep=0; updateDisplay()">最初から</button>
+                </div>
+            `;
+        }
+        
+        function showTestMode() {
+            const steps = courses[currentCourse];
+            const gameArea = document.getElementById('gameArea');
+            
+            if (currentStep >= steps.length) {
+                const percentage = Math.round((score / attempts) * 100);
+                gameArea.innerHTML = `
+                    <div class="results">
+                        <h2>テスト結果</h2>
+                        <div class="score">${percentage}%</div>
+                        <p>正解: ${score} / ${attempts}</p>
+                        <button class="control-btn" onclick="currentStep=0; score=0; attempts=0; updateDisplay()">もう一度テスト</button>
+                    </div>
+                `;
+                return;
+            }
+            
+            const currentItem = steps[currentStep];
+            const correctAnswer = currentStep < steps.length - 1 ? steps[currentStep + 1] : '終了';
+            
+            // ランダムな選択肢を生成
+            const allOptions = [...new Set(steps.concat(['終了']))];
+            const options = [correctAnswer];
+            while (options.length < Math.min(3, allOptions.length)) {
+                const randomOption = allOptions[Math.floor(Math.random() * allOptions.length)];
+                if (!options.includes(randomOption)) {
+                    options.push(randomOption);
+                }
+            }
+            options.sort(() => Math.random() - 0.5);
+            
+            gameArea.innerHTML = `
+                <div class="step-counter">問題 ${currentStep + 1} / ${steps.length}</div>
+                <div class="current-step">
+                    ${currentItem} ${getDirectionIcon(currentItem)}
+                </div>
+                <div style="text-align: center; margin-bottom: 20px; color: #666;">
+                    次は何でしょう？
+                </div>
+                <div class="answer-area">
+                    ${options.map(opt => `
+                        <button class="answer-btn" onclick="testAnswer('${opt}', '${correctAnswer}')">${opt}</button>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        function showViewMode() {
+            const steps = courses[currentCourse];
+            const gameArea = document.getElementById('gameArea');
+            
+            gameArea.innerHTML = `
+                <h2 style="text-align: center; margin-bottom: 20px;">コース${currentCourse}の全体像</h2>
+                <div class="course-list">
+                    ${steps.map((step, index) => `
+                        <div class="course-item">
+                            <div style="display: flex; align-items: center;">
+                                <div class="step-number">${index + 1}</div>
+                                <span style="font-size: 18px;">${step}</span>
+                            </div>
+                            <span style="font-size: 24px;">${getDirectionIcon(step)}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        function showVoiceMode() {
+            const steps = courses[currentCourse];
+            const gameArea = document.getElementById('gameArea');
+            
+            gameArea.innerHTML = `
+                <h2 style="text-align: center; margin-bottom: 20px;">音声練習モード</h2>
+                <p style="text-align: center; margin-bottom: 20px;">音声で道順を読み上げます。リズムに合わせて覚えましょう！</p>
+                <button class="voice-btn" onclick="toggleVoice()">
+                    ${voiceActive ? '停止' : '音声読み上げ開始'}
+                </button>
+                <div class="course-list">
+                    ${steps.map((step, index) => `
+                        <div class="course-item" id="voice-item-${index}">
+                            <div style="display: flex; align-items: center;">
+                                <div class="step-number">${index + 1}</div>
+                                <span style="font-size: 18px;">${step}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        
+        function toggleVoice() {
+            if (!voiceActive) {
+                voiceActive = true;
+                event.target.classList.add('active');
+                speakCourse();
+            } else {
+                voiceActive = false;
+                event.target.classList.remove('active');
+                speechSynthesis.cancel();
+            }
+        }
+        
+        function speakCourse() {
+            const steps = courses[currentCourse];
+            let index = 0;
+            
+            function speakNext() {
+                if (!voiceActive || index >= steps.length) {
+                    voiceActive = false;
+                    document.querySelector('.voice-btn').classList.remove('active');
+                    return;
+                }
+                
+                // 現在のアイテムをハイライト
+                document.querySelectorAll('.course-item').forEach(item => {
+                    item.style.background = '#f5f5f5';
+                });
+                const currentItem = document.getElementById(`voice-item-${index}`);
+                if (currentItem) {
+                    currentItem.style.background = '#ffeb3b';
+                }
+                
+                const text = steps[index].replace(/[🚧🚃📐🚦🛑🐍]/g, '').trim();
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ja-JP';
+                utterance.rate = 0.9;
+                utterance.onend = () => {
+                    index++;
+                    setTimeout(speakNext, 1000);
+                };
+                speechSynthesis.speak(utterance);
+            }
+            
+            speakNext();
+        }
+        
+        function getDirectionIcon(item) {
+            if (item.includes('右')) return '➡️';
+            if (item.includes('左')) return '⬅️';
+            if (item.includes('停車')) return '🅿️';
+            return '';
+        }
+        
+        function checkAnswer(answer) {
+            const steps = courses[currentCourse];
+            const correctAnswer = currentStep < steps.length - 1 ? steps[currentStep + 1] : '終了';
+            
+            if (answer === correctAnswer) {
+                event.target.classList.add('correct');
+                setTimeout(() => {
+                    currentStep++;
+                    updateDisplay();
+                }, 1000);
+            }
+        }
+        
+        function testAnswer(answer, correctAnswer) {
+            attempts++;
+            if (answer === correctAnswer) {
+                score++;
+                event.target.classList.add('correct');
+            } else {
+                event.target.classList.add('wrong');
+            }
+            
+            setTimeout(() => {
+                currentStep++;
+                updateDisplay();
+            }, 1000);
+        }
+        
+        function showAnswer() {
+            const steps = courses[currentCourse];
+            const correctAnswer = currentStep < steps.length - 1 ? steps[currentStep + 1] : '終了';
+            alert(`答え: ${correctAnswer}`);
+        }
+        
+        function nextStep() {
+            currentStep++;
+            updateDisplay();
+        }
+        
+        // 初期表示
+        updateDisplay();
+    </script>
+</body>
+</html>
