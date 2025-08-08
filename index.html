@@ -44,12 +44,12 @@
 
         .mode-btn {
             flex: 1;
-            min-width: 120px;
-            padding: 15px;
+            min-width: 100px;
+            padding: 12px;
             background: white;
             border: none;
             border-radius: 10px;
-            font-size: 15px;
+            font-size: 14px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s;
@@ -333,6 +333,154 @@
             animation: pulse 1s infinite;
         }
 
+        .tile-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tile-btn {
+            padding: 15px;
+            background: #f5f5f5;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            min-height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .tile-btn:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        .tile-btn:active {
+            transform: scale(0.95);
+        }
+
+        .selected-list {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .selected-list-header {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+
+        .selected-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 5px;
+            background: white;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            transition: all 0.2s;
+        }
+
+        .selected-item:hover {
+            background: #f8f9fa;
+        }
+
+        .selected-item.correct {
+            background: #d4edda;
+            border-color: #28a745;
+        }
+
+        .selected-item.wrong {
+            background: #f8d7da;
+            border-color: #dc3545;
+        }
+
+        .selected-item-number {
+            width: 30px;
+            height: 30px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .selected-item-text {
+            flex: 1;
+            font-size: 16px;
+        }
+
+        .selected-item-delete {
+            width: 30px;
+            height: 30px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 18px;
+            line-height: 1;
+            transition: all 0.2s;
+        }
+
+        .selected-item-delete:hover {
+            background: #c82333;
+            transform: scale(1.1);
+        }
+
+        .empty-list-message {
+            text-align: center;
+            color: #adb5bd;
+            padding: 40px;
+            font-size: 16px;
+        }
+
+        .build-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .result-display {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 10px;
+        }
+
+        .result-item {
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 5px;
+        }
+
+        .result-item.correct {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .result-item.wrong {
+            background: #ffebee;
+            color: #c62828;
+        }
+
         .start-screen {
             text-align: center;
             padding: 40px;
@@ -367,6 +515,7 @@
             <button class="mode-btn active" onclick="setMode('practice')">練習モード</button>
             <button class="mode-btn" onclick="setMode('test')">テストモード</button>
             <button class="mode-btn hard" onclick="setMode('hard')">🔥ハードモード</button>
+            <button class="mode-btn" onclick="setMode('build')">🧠完全暗記</button>
             <button class="mode-btn" onclick="setMode('view')">一覧表示</button>
             <button class="mode-btn" onclick="setMode('voice')">音声練習</button>
         </div>
@@ -405,12 +554,16 @@
         let startTime = null;
         let timeLimit = 60;
         let remainingTime = 60;
+        let selectedTiles = [];
+        let buildModeAnswered = false;
 
         function setMode(mode) {
             currentMode = mode;
-            currentStep = -1;  // -1から開始
+            currentStep = -1;
             score = 0;
             attempts = 0;
+            selectedTiles = [];
+            buildModeAnswered = false;
             clearInterval(hardModeTimer);
 
             document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
@@ -432,6 +585,8 @@
             currentStep = -1;  // -1から開始
             score = 0;
             attempts = 0;
+            selectedTiles = [];
+            buildModeAnswered = false;
 
             document.querySelectorAll('.course-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
@@ -496,6 +651,8 @@
                 showTestMode();
             } else if (currentMode === 'hard') {
                 showHardMode();
+            } else if (currentMode === 'build') {
+                showBuildMode();
             } else if (currentMode === 'view') {
                 showViewMode();
             } else if (currentMode === 'voice') {
@@ -818,6 +975,203 @@
         function nextStep() {
             currentStep++;
             updateDisplay();
+        }
+
+        function showBuildMode() {
+            const gameArea = document.getElementById('gameArea');
+            const currentCourseSteps = courses[currentCourse];
+
+            // 重複を除いたユニークなポイントを取得
+            const uniquePoints = new Set();
+            Object.values(courses).forEach(course => {
+                course.forEach(point => uniquePoints.add(point));
+            });
+
+            // ソート処理：カテゴリごとにグループ化
+            const sortedPoints = [...uniquePoints].sort((a, b) => {
+                // まず特殊記号のあるものを優先
+                const getCategory = (str) => {
+                    if (str.includes('🚧')) return 1; // 障害物
+                    if (str.includes('🚃')) return 2; // 踏切・坂道
+                    if (str.includes('📐')) return 3; // クランク
+                    if (str.includes('🚦')) return 4; // 信号
+                    if (str.includes('🛑')) return 5; // 一時停止
+                    if (str.includes('🐍')) return 6; // S字
+                    if (str.includes('停車') || str.includes('停止')) return 7; // 停車・停止
+                    // 数字を含むものは数値順にソート
+                    const match = str.match(/^(\d+)/);
+                    if (match) return 100 + parseInt(match[1]);
+                    return 1000; // その他
+                };
+
+                const catA = getCategory(a);
+                const catB = getCategory(b);
+
+                if (catA !== catB) return catA - catB;
+
+                // 同じカテゴリ内では文字列比較
+                return a.localeCompare(b, 'ja');
+            });
+
+            gameArea.innerHTML = `
+                <h2 style="text-align: center; margin-bottom: 10px;">完全暗記モード - コース${currentCourse}</h2>
+                <p style="text-align: center; color: #666; margin-bottom: 20px;">
+                    タップして正しい順番で選択してください（${currentCourseSteps.length}個）
+                </p>
+
+                <div class="tile-grid" id="tileGrid">
+                    ${sortedPoints.map((point) => `
+                        <button class="tile-btn" onclick="addToSelection('${point.replace(/'/g, "\\'")}')" data-point="${point.replace(/'/g, "&apos;")}">
+                            ${point}
+                        </button>
+                    `).join('')}
+                </div>
+
+                <div class="selected-list">
+                    <div class="selected-list-header">選択した順番（${currentCourseSteps.length}個必要）</div>
+                    <div id="selectedItems">
+                        <div class="empty-list-message">上のタイルをタップして選択してください</div>
+                    </div>
+                </div>
+
+                <div class="build-controls">
+                    <button class="control-btn" onclick="checkBuildAnswer()">回答する</button>
+                    <button class="control-btn" onclick="resetBuildSelection()">リセット</button>
+                    <button class="control-btn" onclick="showBuildAnswer()">答えを見る</button>
+                </div>
+                <div id="buildResult"></div>
+            `;
+
+            selectedTiles = [];
+            buildModeAnswered = false;
+        }
+
+        function addToSelection(point) {
+            if (buildModeAnswered) return;
+
+            selectedTiles.push(point);
+            updateSelectedList();
+
+            // タイルにアニメーション効果
+            const tiles = document.querySelectorAll('.tile-btn');
+            const clickedTile = Array.from(tiles).find(tile => tile.dataset.point === point);
+            if (clickedTile) {
+                clickedTile.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    clickedTile.style.transform = '';
+                }, 100);
+            }
+        }
+
+        function removeFromSelection(index) {
+            if (buildModeAnswered) return;
+
+            selectedTiles.splice(index, 1);
+            updateSelectedList();
+        }
+
+        function updateSelectedList() {
+            const selectedItemsDiv = document.getElementById('selectedItems');
+
+            if (selectedTiles.length === 0) {
+                selectedItemsDiv.innerHTML = '<div class="empty-list-message">上のタイルをタップして選択してください</div>';
+            } else {
+                selectedItemsDiv.innerHTML = selectedTiles.map((item, index) => `
+                    <div class="selected-item" id="selected-${index}">
+                        <div class="selected-item-number">${index + 1}</div>
+                        <div class="selected-item-text">${item}</div>
+                        <button class="selected-item-delete" onclick="removeFromSelection(${index})">×</button>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function checkBuildAnswer() {
+            if (buildModeAnswered) return;
+
+            const correctAnswer = courses[currentCourse];
+            const resultDiv = document.getElementById('buildResult');
+            buildModeAnswered = true;
+
+            let isCorrect = selectedTiles.length === correctAnswer.length;
+            let wrongIndex = -1;
+
+            if (isCorrect) {
+                for (let i = 0; i < correctAnswer.length; i++) {
+                    if (selectedTiles[i] !== correctAnswer[i]) {
+                        isCorrect = false;
+                        wrongIndex = i;
+                        break;
+                    }
+                }
+            } else {
+                wrongIndex = 0;
+            }
+
+            // 選択リストの色を変更
+            for (let i = 0; i < selectedTiles.length; i++) {
+                const item = document.getElementById(`selected-${i}`);
+                if (item) {
+                    if (i < correctAnswer.length && selectedTiles[i] === correctAnswer[i]) {
+                        item.classList.add('correct');
+                    } else {
+                        item.classList.add('wrong');
+                    }
+                }
+            }
+
+            if (isCorrect) {
+                resultDiv.innerHTML = `
+                    <div class="results">
+                        <h3 style="color: #4CAF50;">🎉 完璧！全問正解！ 🎉</h3>
+                        <p>コース${currentCourse}を完全にマスターしています！</p>
+                        <button class="control-btn" onclick="showBuildMode()">もう一度挑戦</button>
+                    </div>
+                `;
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="result-display">
+                        <h3 style="color: #f44336;">惜しい！</h3>
+                        ${selectedTiles.length !== correctAnswer.length ?
+                            `<p>選択数が違います。正解は${correctAnswer.length}個です。（現在: ${selectedTiles.length}個）</p>` :
+                            `<p>${wrongIndex + 1}番目から間違っています。</p>`
+                        }
+                        <div style="margin-top: 15px;">
+                            <strong>正解の順番：</strong>
+                            ${correctAnswer.map((item, index) => `
+                                <div class="result-item ${selectedTiles[index] === item ? 'correct' : 'wrong'}">
+                                    ${index + 1}. ${item}
+                                    ${selectedTiles[index] && selectedTiles[index] !== item ?
+                                        `<span style="text-decoration: line-through; margin-left: 10px;">（あなた: ${selectedTiles[index]}）</span>` :
+                                        selectedTiles[index] === undefined ? '<span style="margin-left: 10px;">（未選択）</span>' : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                        <button class="control-btn" onclick="showBuildMode()" style="margin-top: 15px;">もう一度挑戦</button>
+                    </div>
+                `;
+            }
+        }
+
+        function resetBuildSelection() {
+            selectedTiles = [];
+            buildModeAnswered = false;
+            updateSelectedList();
+            document.getElementById('buildResult').innerHTML = '';
+
+            // 選択リストの色をリセット
+            const items = document.querySelectorAll('.selected-item');
+            items.forEach(item => {
+                item.classList.remove('correct', 'wrong');
+            });
+        }
+
+        function showBuildAnswer() {
+            const correctAnswer = courses[currentCourse];
+            const message = correctAnswer.map((item, index) =>
+                `${index + 1}. ${item}`
+            ).join('\n');
+            alert(`コース${currentCourse}の正解順序:\n\n${message}`);
         }
 
         // 初期表示
