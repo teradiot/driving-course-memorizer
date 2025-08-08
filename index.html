@@ -184,6 +184,13 @@
             flex-wrap: wrap;
         }
 
+        .answer-area.grid-2x2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 15px;
+        }
+
         .answer-btn {
             flex: 1;
             min-width: 150px;
@@ -624,7 +631,7 @@
                 <div style="text-align: center; margin-bottom: 20px; color: #666;">
                     次は何でしょう？
                 </div>
-                <div class="answer-area">
+                <div class="answer-area grid-2x2">
                     ${options.map(opt => `
                         <button class="answer-btn" onclick="hardModeAnswer('${opt}', '${correctAnswer}')">${opt}</button>
                     `).join('')}
@@ -668,13 +675,13 @@
                 setTimeout(() => {
                     currentStep++;
                     updateDisplay();
-                }, 500);
+                }, 400);
             } else {
                 event.target.classList.add('wrong');
                 clearInterval(hardModeTimer);
                 setTimeout(() => {
                     showHardModeResult(false);
-                }, 1000);
+                }, 400);
             }
         }
 
@@ -799,7 +806,7 @@
             setTimeout(() => {
                 currentStep++;
                 updateDisplay();
-            }, 1000);
+            }, 400);
         }
 
         function showAnswer() {
