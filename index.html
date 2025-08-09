@@ -354,6 +354,8 @@
             justify-content: center;
             font-size: 14px;
             text-align: center;
+            user-select: none;
+            -webkit-user-select: none;
         }
 
         .tile-btn:hover {
@@ -364,6 +366,82 @@
 
         .tile-btn:active {
             transform: scale(0.95);
+        }
+
+        .flick-menu {
+            position: fixed;
+            display: none;
+            z-index: 1000;
+            background: white;
+            border-radius: 50px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            padding: 20px;
+            transform: translate(-50%, -50%);
+        }
+
+        .flick-menu.active {
+            display: flex;
+            animation: popIn 0.2s ease-out;
+        }
+
+        @keyframes popIn {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .flick-center {
+            width: 80px;
+            height: 80px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .flick-option {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: #4CAF50;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            transition: all 0.2s;
+            z-index: 1;
+        }
+
+        .flick-option.left {
+            left: -80px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .flick-option.right {
+            right: -80px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .flick-option.active {
+            background: #FF6B6B;
+            transform: scale(1.3) translateY(-50%);
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.5);
         }
 
         .selected-list {
@@ -556,6 +634,8 @@
         let remainingTime = 60;
         let selectedTiles = [];
         let buildModeAnswered = false;
+        let activeFlickMenu = null;
+        let flickStartPoint = null;
 
         function setMode(mode) {
             currentMode = mode;
@@ -565,6 +645,14 @@
             selectedTiles = [];
             buildModeAnswered = false;
             clearInterval(hardModeTimer);
+
+            // フリック入力のクリーンアップ
+            document.removeEventListener('mousemove', handleFlickMove);
+            document.removeEventListener('mouseup', handleFlickEnd);
+            document.removeEventListener('touchmove', handleFlickMove);
+            document.removeEventListener('touchend', handleFlickEnd);
+            activeFlickMenu = null;
+            flickStartPoint = null;
 
             document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
@@ -587,6 +675,14 @@
             attempts = 0;
             selectedTiles = [];
             buildModeAnswered = false;
+
+            // フリック入力のクリーンアップ
+            document.removeEventListener('mousemove', handleFlickMove);
+            document.removeEventListener('mouseup', handleFlickEnd);
+            document.removeEventListener('touchmove', handleFlickMove);
+            document.removeEventListener('touchend', handleFlickEnd);
+            activeFlickMenu = null;
+            flickStartPoint = null;
 
             document.querySelectorAll('.course-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
@@ -981,50 +1077,63 @@
             const gameArea = document.getElementById('gameArea');
             const currentCourseSteps = courses[currentCourse];
 
-            // 重複を除いたユニークなポイントを取得
-            const uniquePoints = new Set();
-            Object.values(courses).forEach(course => {
-                course.forEach(point => uniquePoints.add(point));
-            });
-
-            // ソート処理：カテゴリごとにグループ化
-            const sortedPoints = [...uniquePoints].sort((a, b) => {
-                // まず特殊記号のあるものを優先
-                const getCategory = (str) => {
-                    if (str.includes('🚧')) return 1; // 障害物
-                    if (str.includes('🚃')) return 2; // 踏切・坂道
-                    if (str.includes('📐')) return 3; // クランク
-                    if (str.includes('🚦')) return 4; // 信号
-                    if (str.includes('🛑')) return 5; // 一時停止
-                    if (str.includes('🐍')) return 6; // S字
-                    if (str.includes('停車') || str.includes('停止')) return 7; // 停車・停止
-                    // 数字を含むものは数値順にソート
-                    const match = str.match(/^(\d+)/);
-                    if (match) return 100 + parseInt(match[1]);
-                    return 1000; // その他
-                };
-
-                const catA = getCategory(a);
-                const catB = getCategory(b);
-
-                if (catA !== catB) return catA - catB;
-
-                // 同じカテゴリ内では文字列比較
-                return a.localeCompare(b, 'ja');
-            });
+            // フリック入力用のタイル定義
+            const flickTiles = [
+                { base: '🚧 障害物①', options: [] },
+                { base: '🚃 踏切・坂道', options: [] },
+                { base: '📐 クランク', options: ['右', '左'] },
+                { base: '🚦 信号', options: ['右', '左'] },
+                { base: '🛑 一時停止①・左', options: [] },
+                { base: '🛑 一時停止②', options: ['右', '左'] },
+                { base: '🐍 S字・右', options: [] },
+                { base: '1・右', options: [] },
+                { base: '2', options: ['右', '左'] },
+                { base: '3', options: ['右', '左'] },
+                { base: '4', options: ['右', '左'] },
+                { base: '5', options: ['右', '左'] },
+                { base: '7・右', options: [] },
+                { base: '8・右', options: [] },
+                { base: '9', options: ['右', '左'] },
+                { base: '11', options: ['右', '左'] },
+                { base: '13・左', options: [] },
+                { base: '50', options: [] },
+                { base: '50停車', options: [] },
+                { base: '停車', options: [] }
+            ];
 
             gameArea.innerHTML = `
                 <h2 style="text-align: center; margin-bottom: 10px;">完全暗記モード - コース${currentCourse}</h2>
-                <p style="text-align: center; color: #666; margin-bottom: 20px;">
-                    タップして正しい順番で選択してください（${currentCourseSteps.length}個）
+                <p style="text-align: center; color: #666; margin-bottom: 10px;">
+                    ➕付きは長押し＆スライド / 無印はタップで選択（${currentCourseSteps.length}個）
+                </p>
+                <p style="text-align: center; color: #999; font-size: 12px; margin-bottom: 20px;">
+                    PC: クリック＆ドラッグ / スマホ: タップ＆スワイプ
                 </p>
 
                 <div class="tile-grid" id="tileGrid">
-                    ${sortedPoints.map((point) => `
-                        <button class="tile-btn" onclick="addToSelection('${point.replace(/'/g, "\\'")}')" data-point="${point.replace(/'/g, "&apos;")}">
-                            ${point}
-                        </button>
-                    `).join('')}
+                    ${flickTiles.map((tile, index) => {
+                        const hasOptions = tile.options.length > 0;
+                        const optionsAttr = hasOptions ? `data-options='${JSON.stringify(tile.options)}'` : '';
+                        return `
+                            <button class="tile-btn"
+                                    id="tile-${index}"
+                                    data-base="${tile.base.replace(/'/g, "&apos;")}"
+                                    ${optionsAttr}
+                                    ${hasOptions ?
+                                        `onmousedown="startFlick(event, '${tile.base.replace(/'/g, "\\'")}')"
+                                         ontouchstart="startFlick(event, '${tile.base.replace(/'/g, "\\'")}')"` :
+                                        `onclick="addToSelection('${tile.base.replace(/'/g, "\\'")}')"`
+                                    }>
+                                ${tile.base}${hasOptions ? ' ➕' : ''}
+                            </button>
+                        `;
+                    }).join('')}
+                </div>
+
+                <div class="flick-menu" id="flickMenu">
+                    <div class="flick-center" id="flickCenter"></div>
+                    <div class="flick-option left" id="flickLeft">← 左</div>
+                    <div class="flick-option right" id="flickRight">右 →</div>
                 </div>
 
                 <div class="selected-list">
@@ -1042,8 +1151,99 @@
                 <div id="buildResult"></div>
             `;
 
+            // イベントリスナーの設定
+            document.addEventListener('mousemove', handleFlickMove);
+            document.addEventListener('mouseup', handleFlickEnd);
+            document.addEventListener('touchmove', handleFlickMove, {passive: false});
+            document.addEventListener('touchend', handleFlickEnd);
+
             selectedTiles = [];
             buildModeAnswered = false;
+        }
+
+        function startFlick(event, base) {
+            event.preventDefault();
+            if (buildModeAnswered) return;
+
+            const tile = event.currentTarget;
+            const options = JSON.parse(tile.dataset.options || '[]');
+
+            if (options.length === 0) {
+                addToSelection(base);
+                return;
+            }
+
+            const flickMenu = document.getElementById('flickMenu');
+            const flickCenter = document.getElementById('flickCenter');
+            const flickLeft = document.getElementById('flickLeft');
+            const flickRight = document.getElementById('flickRight');
+
+            // メニューの位置を設定
+            const rect = tile.getBoundingClientRect();
+            flickMenu.style.left = (rect.left + rect.width / 2) + 'px';
+            flickMenu.style.top = (rect.top + rect.height / 2) + 'px';
+
+            flickCenter.textContent = base;
+
+            // 左右両方の選択肢がある場合のみ表示
+            flickLeft.style.display = options.includes('左') ? 'flex' : 'none';
+            flickRight.style.display = options.includes('右') ? 'flex' : 'none';
+
+            flickMenu.classList.add('active');
+            activeFlickMenu = { base, options };
+
+            const touch = event.touches ? event.touches[0] : event;
+            flickStartPoint = { x: touch.clientX, y: touch.clientY };
+        }
+
+        function handleFlickMove(event) {
+            if (!activeFlickMenu || !flickStartPoint) return;
+            event.preventDefault();
+
+            const touch = event.touches ? event.touches[0] : event;
+            const dx = touch.clientX - flickStartPoint.x;
+
+            const flickLeft = document.getElementById('flickLeft');
+            const flickRight = document.getElementById('flickRight');
+
+            // アクティブ状態をリセット
+            flickLeft.classList.remove('active');
+            flickRight.classList.remove('active');
+
+            // 方向を判定してハイライト
+            const threshold = 30;
+            if (dx < -threshold && activeFlickMenu.options.includes('左')) {
+                flickLeft.classList.add('active');
+            } else if (dx > threshold && activeFlickMenu.options.includes('右')) {
+                flickRight.classList.add('active');
+            }
+        }
+
+        function handleFlickEnd(event) {
+            if (!activeFlickMenu || !flickStartPoint) return;
+
+            const touch = event.changedTouches ? event.changedTouches[0] : event;
+            const dx = touch.clientX - flickStartPoint.x;
+
+            const threshold = 30;
+            let selected = null;
+
+            if (dx < -threshold && activeFlickMenu.options.includes('左')) {
+                selected = activeFlickMenu.base + '・左';
+            } else if (dx > threshold && activeFlickMenu.options.includes('右')) {
+                selected = activeFlickMenu.base + '・右';
+            }
+
+            if (selected) {
+                addToSelection(selected);
+            }
+
+            // メニューを非表示
+            const flickMenu = document.getElementById('flickMenu');
+            flickMenu.classList.remove('active');
+
+            activeFlickMenu = null;
+            flickStartPoint = null;
         }
 
         function addToSelection(point) {
@@ -1051,16 +1251,6 @@
 
             selectedTiles.push(point);
             updateSelectedList();
-
-            // タイルにアニメーション効果
-            const tiles = document.querySelectorAll('.tile-btn');
-            const clickedTile = Array.from(tiles).find(tile => tile.dataset.point === point);
-            if (clickedTile) {
-                clickedTile.style.transform = 'scale(0.95)';
-                setTimeout(() => {
-                    clickedTile.style.transform = '';
-                }, 100);
-            }
         }
 
         function removeFromSelection(index) {
@@ -1164,6 +1354,14 @@
             items.forEach(item => {
                 item.classList.remove('correct', 'wrong');
             });
+
+            // フリックメニューもリセット
+            const flickMenu = document.getElementById('flickMenu');
+            if (flickMenu) {
+                flickMenu.classList.remove('active');
+            }
+            activeFlickMenu = null;
+            flickStartPoint = null;
         }
 
         function showBuildAnswer() {
