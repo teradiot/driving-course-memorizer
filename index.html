@@ -368,6 +368,13 @@
             transform: scale(0.95);
         }
 
+        .tile-btn.flick-active {
+            background: #667eea;
+            color: white;
+            transform: scale(0.95);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.3);
+        }
+
         .flick-menu {
             position: fixed;
             display: none;
@@ -636,6 +643,9 @@
         let buildModeAnswered = false;
         let activeFlickMenu = null;
         let flickStartPoint = null;
+        let longPressTimer = null;
+        let isLongPressed = false;
+        let isDragging = false;
 
         function setMode(mode) {
             currentMode = mode;
@@ -645,6 +655,7 @@
             selectedTiles = [];
             buildModeAnswered = false;
             clearInterval(hardModeTimer);
+            clearTimeout(longPressTimer);
 
             // フリック入力のクリーンアップ
             document.removeEventListener('mousemove', handleFlickMove);
@@ -653,6 +664,8 @@
             document.removeEventListener('touchend', handleFlickEnd);
             activeFlickMenu = null;
             flickStartPoint = null;
+            isLongPressed = false;
+            isDragging = false;
 
             document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
@@ -675,6 +688,7 @@
             attempts = 0;
             selectedTiles = [];
             buildModeAnswered = false;
+            clearTimeout(longPressTimer);
 
             // フリック入力のクリーンアップ
             document.removeEventListener('mousemove', handleFlickMove);
@@ -683,6 +697,8 @@
             document.removeEventListener('touchend', handleFlickEnd);
             activeFlickMenu = null;
             flickStartPoint = null;
+            isLongPressed = false;
+            isDragging = false;
 
             document.querySelectorAll('.course-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
@@ -1104,10 +1120,10 @@
             gameArea.innerHTML = `
                 <h2 style="text-align: center; margin-bottom: 10px;">完全暗記モード - コース${currentCourse}</h2>
                 <p style="text-align: center; color: #666; margin-bottom: 10px;">
-                    ➕付きは長押し＆スライド / 無印はタップで選択（${currentCourseSteps.length}個）
+                    ➕付きは0.3秒長押し＆スライド / 無印はタップで選択（${currentCourseSteps.length}個）
                 </p>
                 <p style="text-align: center; color: #999; font-size: 12px; margin-bottom: 20px;">
-                    PC: クリック＆ドラッグ / スマホ: タップ＆スワイプ
+                    ※スクロール時の誤操作防止のため長押しが必要です
                 </p>
 
                 <div class="tile-grid" id="tileGrid">
@@ -1173,6 +1189,32 @@
                 return;
             }
 
+            // タッチ/マウスの開始位置を記録
+            const touch = event.touches ? event.touches[0] : event;
+            flickStartPoint = { x: touch.clientX, y: touch.clientY };
+            isLongPressed = false;
+            isDragging = false;
+
+            // 長押しタイマー開始（300ms）
+            longPressTimer = setTimeout(() => {
+                if (!isDragging && flickStartPoint) {
+                    isLongPressed = true;
+
+                    // 振動フィードバック（対応デバイスのみ）
+                    if (navigator.vibrate) {
+                        navigator.vibrate(50);
+                    }
+
+                    // フリックメニュー表示
+                    showFlickMenu(tile, base, options);
+                }
+            }, 300);
+
+            // ドラッグ開始時の一時的な変数保存
+            activeFlickMenu = { base, options, tile };
+        }
+
+        function showFlickMenu(tile, base, options) {
             const flickMenu = document.getElementById('flickMenu');
             const flickCenter = document.getElementById('flickCenter');
             const flickLeft = document.getElementById('flickLeft');
@@ -1190,18 +1232,38 @@
             flickRight.style.display = options.includes('右') ? 'flex' : 'none';
 
             flickMenu.classList.add('active');
-            activeFlickMenu = { base, options };
 
-            const touch = event.touches ? event.touches[0] : event;
-            flickStartPoint = { x: touch.clientX, y: touch.clientY };
+            // タイルにアクティブ状態を追加
+            tile.classList.add('flick-active');
         }
 
         function handleFlickMove(event) {
-            if (!activeFlickMenu || !flickStartPoint) return;
-            event.preventDefault();
+            if (!flickStartPoint) return;
 
             const touch = event.touches ? event.touches[0] : event;
             const dx = touch.clientX - flickStartPoint.x;
+            const dy = touch.clientY - flickStartPoint.y;
+
+            // 縦スクロール検知（10px以上の縦移動）
+            if (!isLongPressed && Math.abs(dy) > 10) {
+                isDragging = true;
+                clearTimeout(longPressTimer);
+                cancelFlick();
+                return;
+            }
+
+            // 横スクロール検知（誤操作防止のため横移動も初期段階でチェック）
+            if (!isLongPressed && Math.abs(dx) > 10) {
+                isDragging = true;
+                clearTimeout(longPressTimer);
+                cancelFlick();
+                return;
+            }
+
+            // フリックメニューが表示されている場合のみ処理
+            if (!isLongPressed || !activeFlickMenu) return;
+
+            event.preventDefault();
 
             const flickLeft = document.getElementById('flickLeft');
             const flickRight = document.getElementById('flickRight');
@@ -1219,8 +1281,37 @@
             }
         }
 
+        function cancelFlick() {
+            const flickMenu = document.getElementById('flickMenu');
+            if (flickMenu) {
+                flickMenu.classList.remove('active');
+            }
+
+            // タイルのアクティブ状態を解除
+            const activeTile = document.querySelector('.tile-btn.flick-active');
+            if (activeTile) {
+                activeTile.classList.remove('flick-active');
+            }
+
+            activeFlickMenu = null;
+            flickStartPoint = null;
+            isLongPressed = false;
+            isDragging = false;
+            clearTimeout(longPressTimer);
+        }
+
         function handleFlickEnd(event) {
-            if (!activeFlickMenu || !flickStartPoint) return;
+            clearTimeout(longPressTimer);
+
+            if (!flickStartPoint) return;
+
+            // 長押しされていない場合は何もしない
+            if (!isLongPressed) {
+                cancelFlick();
+                return;
+            }
+
+            if (!activeFlickMenu) return;
 
             const touch = event.changedTouches ? event.changedTouches[0] : event;
             const dx = touch.clientX - flickStartPoint.x;
@@ -1238,12 +1329,7 @@
                 addToSelection(selected);
             }
 
-            // メニューを非表示
-            const flickMenu = document.getElementById('flickMenu');
-            flickMenu.classList.remove('active');
-
-            activeFlickMenu = null;
-            flickStartPoint = null;
+            cancelFlick();
         }
 
         function addToSelection(point) {
@@ -1355,13 +1441,8 @@
                 item.classList.remove('correct', 'wrong');
             });
 
-            // フリックメニューもリセット
-            const flickMenu = document.getElementById('flickMenu');
-            if (flickMenu) {
-                flickMenu.classList.remove('active');
-            }
-            activeFlickMenu = null;
-            flickStartPoint = null;
+            // フリック関連のリセット
+            cancelFlick();
         }
 
         function showBuildAnswer() {
